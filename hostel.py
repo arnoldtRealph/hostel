@@ -114,14 +114,15 @@ def load_learner_data():
         df['Learner_Full_Name'] = df['Learner_Full_Name'].str.strip()
         
         # Verify expected columns
-        expected_columns = ['Leerder van', 'Leerner se naam', 'Geslag', 'Klasgroep', 'Opvoeder betrokke', 'Wat het gebeur', 'Kategorie', 'Kommentaar']
+        expected_columns = ['Leerder van', 'Leerner se naam', 'Geslag', 'BLOK', 'Opvoeder betrokke', 'Wat het gebeur', 'Kategorie']
         missing_columns = [col for col in expected_columns if col not in df.columns]
         if missing_columns:
             # Silently handle missing columns
             pass
         
+        # Rename columns to match internal usage
         df = df.rename(columns={
-            'Klasgroep': 'Class',
+            'BLOK': 'Class',  # Updated to map BLOK to Class
             'Opvoeder betrokke': 'Teacher',
             'Wat het gebeur': 'Incident',
             'Kategorie': 'Category',
