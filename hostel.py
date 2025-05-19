@@ -20,74 +20,61 @@ plt.rcParams['ytick.labelsize'] = 9
 # Set page config
 st.set_page_config(page_title="Hostel Insident Verslag", layout="wide")
 
-# Custom CSS for professional styling and mobile responsiveness
+# Custom CSS for futuristic and professional styling
 st.markdown("""
     <style>
         /* General layout */
         .stApp {
-            background-color: #f5f7fa;
-            font-family: 'Roboto', sans-serif;
-            color: #333333;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Orbitron', sans-serif;
+            color: #e2e8f0;
             text-align: center;
         }
         [data-baseweb="baseweb"] {
-            background-color: #f5f7fa !important;
-        }
-
-        /* Dark mode adjustments */
-        [data-theme="dark"] .stApp, [data-theme="dark"] [data-baseweb="baseweb"] {
-            background-color: #1a1d21 !important;
-            color: #e0e0e0 !important;
-        }
-        [data-theme="dark"] .main .block-container {
-            background-color: #2a2e34 !important;
-            color: #e0e0e0 !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-        }
-        [data-theme="dark"] .stMarkdown, [data-theme="dark"] .stText, 
-        [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3 {
-            color: #e0e0e0 !important;
+            background: transparent !important;
         }
 
         /* Main content */
         .main .block-container {
             padding: 40px;
-            background-color: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 229, 255, 0.2);
             margin-bottom: 30px;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             max-width: 1400px;
             margin-left: auto;
             margin-right: auto;
+            backdrop-filter: blur(10px);
         }
         .main .block-container:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            box-shadow: 0 12px 40px rgba(0, 229, 255, 0.3);
         }
 
         /* Headers */
         h1 {
-            color: #1a3c34;
-            font-size: 2.8rem;
+            color: #00e5ff;
+            font-size: 3rem;
             font-weight: 700;
             margin-bottom: 25px;
             text-align: center;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
         }
         h2 {
-            color: #2e5a52;
-            font-size: 2rem;
+            color: #38bdf8;
+            font-size: 2.2rem;
             font-weight: 600;
             margin-top: 30px;
             margin-bottom: 20px;
-            border-bottom: 3px solid #e0e6ed;
+            border-bottom: 3px solid #0ea5e9;
             padding-bottom: 8px;
             text-align: center;
         }
         h3 {
-            color: #2e5a52;
-            font-size: 1.5rem;
+            color: #38bdf8;
+            font-size: 1.6rem;
             font-weight: 500;
             margin-bottom: 15px;
             text-align: center;
@@ -95,23 +82,20 @@ st.markdown("""
 
         /* Input labels */
         .input-label {
-            color: #2e5a52;
+            color: #38bdf8;
             font-size: 1.2rem;
             font-weight: 500;
             margin-bottom: 10px;
             display: block;
             text-align: center;
         }
-        [data-theme="dark"] .input-label {
-            color: #e0e0e0 !important;
-        }
 
         /* Buttons */
         .stButton>button, .stDownloadButton>button {
-            background-color: #28b463;
+            background: linear-gradient(45deg, #0ea5e9, #38bdf8);
             color: #ffffff !important;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 12px 20px;
             font-size: 1rem;
             font-weight: 500;
@@ -119,42 +103,55 @@ st.markdown("""
             max-width: 250px;
             width: 100%;
             margin: 10px auto;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
             text-align: center;
             display: block;
         }
         .stButton>button:hover, .stDownloadButton>button:hover {
-            background-color: #155e4f;
+            background: linear-gradient(45deg, #0284c7, #0ea5e9);
             transform: translateY(-2px);
-            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.7);
         }
         .stButton>button:active, .stDownloadButton>button:active {
-            background-color: #124a40;
+            background: linear-gradient(45deg, #0369a1, #0284c7);
             transform: translateY(0);
         }
         .stButton>button:disabled, .stDownloadButton>button:disabled {
-            background-color: #a0a9b2;
-            color: #d3d3d3 !important;
+            background: #475569;
+            color: #94a3b8 !important;
             box-shadow: none;
         }
 
-        /* Download button specific */
+        /* Delete button */
+        .stButton>button.delete-button {
+            background: linear-gradient(45deg, #ef4444, #f87171);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+        .stButton>button.delete-button:hover {
+            background: linear-gradient(45deg, #dc2626, #ef4444);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.7);
+        }
+        .stButton>button.delete-button:active {
+            background: linear-gradient(45deg, #b91c1c, #dc2626);
+        }
+
+        /* Download button */
         .stDownloadButton>button {
-            background-color: #007bff;
+            background: linear-gradient(45deg, #10b981, #34d399);
         }
         .stDownloadButton>button:hover {
-            background-color: #0056b3;
+            background: linear-gradient(45deg, #059669, #10b981);
         }
         .stDownloadButton>button:active {
-            background-color: #004085;
+            background: linear-gradient(45deg, #047857, #059669);
         }
 
         /* Dataframe styling */
         .stDataFrame {
-            border: 1px solid #e0e6ed;
+            border: 1px solid #0ea5e9;
             border-radius: 12px;
             overflow-x: auto;
-            background-color: #ffffff;
+            background: rgba(30, 41, 59, 0.8);
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -164,46 +161,31 @@ st.markdown("""
             border-spacing: 0;
         }
         .stDataFrame th {
-            background-color: #e8ecef;
-            color: #1a3c34;
+            background: #1e293b;
+            color: #38bdf8;
             font-weight: 600;
             padding: 15px;
             text-align: left;
             font-size: 1rem;
-            border-bottom: 2px solid #d3dbe3;
-        }
-        [data-theme="dark"] .stDataFrame th {
-            background-color: #3a3f46;
-            color: #e0e0e0;
-            border-bottom: 2px solid #4a5059;
+            border-bottom: 2px solid #0ea5e9;
         }
         .stDataFrame td {
             padding: 15px;
-            border-bottom: 1px solid #e0e6ed;
-            color: #333333;
+            border-bottom: 1px solid #334155;
+            color: #e2e8f0;
             font-size: 0.95rem;
         }
-        [data-theme="dark"] .stDataFrame td {
-            color: #e0e0e0;
-            border-bottom: 1px solid #4a5059;
-        }
         .stDataFrame tr:nth-child(even) {
-            background-color: #f9fafc;
-        }
-        [data-theme="dark"] .stDataFrame tr:nth-child(even) {
-            background-color: #2e3238;
+            background: rgba(51, 65, 85, 0.3);
         }
         .stDataFrame tr:hover {
-            background-color: #e8ecef;
-        }
-        [data-theme="dark"] .stDataFrame tr:hover {
-            background-color: #3a3f46;
+            background: rgba(14, 165, 233, 0.2);
         }
 
-        /* Selectbox (dropdowns) */
+        /* Selectbox */
         .stSelectbox {
-            background-color: #ffffff;
-            border: 1px solid #ced4da;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #0ea5e9;
             border-radius: 10px;
             padding: 12px;
             font-size: 1rem;
@@ -212,25 +194,43 @@ st.markdown("""
             width: 100%;
             margin: 10px auto;
             display: block;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        [data-theme="dark"] .stSelectbox {
-            background-color: #2e3238;
-            border: 1px solid #4a5059;
-            color: #e0e0e0;
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
         }
         .stSelectbox:hover {
-            border-color: #1a3c34;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border-color: #38bdf8;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
         }
         .stSelectbox > div > div {
             min-height: 48px;
+            color: #00e5ff !important; /* Brighter cyan for selected value */
+            background: rgba(15, 23, 42, 0.9);
+        }
+        /* Dropdown menu items */
+        .stSelectbox [data-baseweb="select"] ul {
+            background: #1e293b !important;
+            border: 1px solid #0ea5e9 !important;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 229, 255, 0.2);
+        }
+        .stSelectbox [data-baseweb="select"] li {
+            color: #e2e8f0 !important; /* Light gray for dropdown options */
+            padding: 10px;
+            transition: background 0.2s ease;
+        }
+        .stSelectbox [data-baseweb="select"] li:hover {
+            background: #0ea5e9 !important;
+            color: #ffffff !important; /* White text on hover for contrast */
+        }
+        .stSelectbox [data-baseweb="select"] li[aria-selected="true"] {
+            background: #38bdf8 !important;
+            color: #ffffff !important; /* White text for selected item */
+            font-weight: 600;
         }
 
         /* Text area */
         .stTextArea {
-            background-color: #ffffff;
-            border: 1px solid #ced4da;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #0ea5e9;
             border-radius: 10px;
             padding: 12px;
             font-size: 1rem;
@@ -239,16 +239,12 @@ st.markdown("""
             width: 100%;
             margin: 10px auto;
             display: block;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        [data-theme="dark"] .stTextArea {
-            background-color: #2e3238;
-            border: 1px solid #4a5059;
-            color: #e0e0e0;
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+            color: #e2e8f0;
         }
         .stTextArea:hover {
-            border-color: #1a3c34;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border-color: #38bdf8;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
         }
 
         /* Tabs */
@@ -258,56 +254,53 @@ st.markdown("""
             margin-bottom: 20px;
         }
         .stTabs [data-baseweb="tab"] {
-            background-color: #e8ecef;
+            background: #1e293b;
             border-radius: 10px 10px 0 0;
             padding: 12px 24px;
             font-size: 1rem;
-            color: #2e5a52;
+            color: #38bdf8;
             margin-right: 6px;
             transition: all 0.3s ease;
         }
         .stTabs [data-baseweb="tab"]:hover {
-            background-color: #d3dbe3;
+            background: #334155;
         }
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #1a3c34;
+            background: #0ea5e9;
             color: #ffffff;
             font-weight: 600;
-        }
-        [data-theme="dark"] .stTabs [data-baseweb="tab"] {
-            background-color: #2e3238;
-            color: #e0e0e0;
-        }
-        [data-theme="dark"] .stTabs [data-baseweb="tab"]:hover {
-            background-color: #3a3f46;
-        }
-        [data-theme="dark"] .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #155e4f;
-            color: #ffffff;
         }
 
         /* Charts */
         .stPyplot {
             border-radius: 12px;
             padding: 15px;
-            background-color: #ffffff;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            background: rgba(15, 23, 42, 0.9);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
             max-width: 700px;
             margin: 0 auto;
-        }
-        [data-theme="dark"] .stPyplot {
-            background-color: #2e3238;
         }
 
         /* Separator */
         .custom-divider {
-            border-top: 5px solid #e0e6ed;
+            border-top: 5px solid #0ea5e9;
             margin: 40px auto;
             max-width: 900px;
             border-radius: 2px;
         }
-        [data-theme="dark"] .custom-divider {
-            border-top: 5px solid #4a5059;
+
+        /* Notification */
+        .notification-container > div {
+            background: rgba(239, 68, 68, 0.2) !important;
+            border: 2px solidity #ef4444 !important;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+        }
+        .notification-container > div > h4 {
+            color: #f87171 !important;
+            text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        }
+        .notification-container > div > p {
+            color: #e2e8f0 !important;
         }
 
         /* Mobile optimization */
@@ -362,6 +355,7 @@ st.markdown("""
             }
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
 """, unsafe_allow_html=True)
 
 # Load and preprocess learner data
@@ -388,7 +382,6 @@ def load_incident_log():
     try:
         df = pd.read_csv("incident_log.csv")
         df.columns = df.columns.str.strip()
-        # Standardize column names
         column_mapping = {
             'BLOK': 'Block',
             'Opvoeder betrokke': 'Teacher',
@@ -399,7 +392,6 @@ def load_incident_log():
             'Datum': 'Date'
         }
         df = df.rename(columns=column_mapping)
-        # Ensure all expected columns exist
         expected_columns = ['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date']
         for col in expected_columns:
             if col not in df.columns:
@@ -427,12 +419,15 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log.to_csv("incident_log.csv", index=False)
     return incident_log
 
-# Clear a single incident
-def clear_incident(index):
+# Remove incident from log
+def remove_incident(display_index):
     incident_log = load_incident_log()
-    if index in incident_log.index:
-        incident_log = incident_log.drop(index)
+    # Convert display index (1-based) to internal index (0-based)
+    internal_index = display_index - 1
+    if internal_index in incident_log.index:
+        incident_log = incident_log.drop(internal_index).reset_index(drop=True)
         incident_log.to_csv("incident_log.csv", index=False)
+        return incident_log
     return incident_log
 
 # Generate Word document for all incidents
@@ -474,7 +469,7 @@ def generate_word_report(df):
     plt.close()
     doc.add_picture(img_stream, width=Inches(3.5))
 
-    # Bar chart: Incidents by Block (only if Block column exists)
+    # Bar chart: Incidents by Block
     if 'Block' in df.columns:
         fig, ax = plt.subplots(figsize=(4, 2.5))
         block_counts = df['Block'].value_counts()
@@ -571,9 +566,9 @@ if not incident_log.empty:
             any_notifications = True
             st.markdown(
                 f"""
-                <div style='background-color: #ffe6e6; padding: 15px; border-radius: 8px; border: 2px solid #cc0000;'>
-                    <h4 style='color: #cc0000; margin: 0;'>SANKSIEMELDING</h4>
-                    <p style='color: #333; margin: 5px 0; font-size: 0.9rem;'>
+                <div style='padding: 15px; border-radius: 8px;'>
+                    <h4 style='margin: 0;'>SANKSIEMELDING</h4>
+                    <p style='margin: 5px 0; font-size: 0.9rem;'>
                         Leerder <strong>{row['Learner']}</strong> het {row['Count']} Kategorie {row['Category']} insidente. 
                         Sanksie: {row['Sanction']}
                     </p>
@@ -587,8 +582,8 @@ if not incident_log.empty:
     if not any_notifications:
         st.markdown(
             """
-            <div style='background-color: #e6f3e6; padding: 15px; border-radius: 8px; border: 2px solid #28b463;'>
-                <p style='color: #333; margin: 0; font-size: 0.9rem;'>Geen aktiewe sanksiemeldings nie.</p>
+            <div style='background: rgba(34, 197, 94, 0.2); padding: 15px; border-radius: 8px; border: 2px solid #34d399;'>
+                <p style='margin: 0; font-size: 0.9rem;'>Geen aktiewe sanksiemeldings nie.</p>
             </div>
             """,
             unsafe_allow_html=True
@@ -626,8 +621,11 @@ with st.container():
 # Incident log display
 st.header("Insident Log")
 if not incident_log.empty:
+    # Create a display DataFrame with 1-based index
+    display_log = incident_log.copy()
+    display_log.index = display_log.index + 1
     st.dataframe(
-        incident_log,
+        display_log,
         use_container_width=True,
         column_config={
             "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
@@ -639,6 +637,15 @@ if not incident_log.empty:
             "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
         }
     )
+    
+    # Remove incident section
+    st.subheader("Verwyder Insident")
+    incident_index = st.number_input("Voer die indeks van die insident in om te verwyder", min_value=1, max_value=len(incident_log), step=1)
+    if st.button("Verwyder Insident", key="remove_incident", help="Klik om die geselekteerde insident te verwyder"):
+        incident_log = remove_incident(incident_index)
+        st.success(f"Insident by indeks {incident_index} suksesvol verwyder!")
+        st.rerun()
+    
     st.download_button(
         label="Laai Verslag af as Word",
         data=generate_word_report(incident_log),
