@@ -362,21 +362,25 @@ st.markdown("""
 # Load and preprocess learner data
 @st.cache_data
 def load_learner_data():
-    df = pd.read_csv("learner_list.csv")
-    df.columns = df.columns.str.strip()
-    df['Learner_Full_Name'] = (df['Leerder van'].fillna('') + ' ' + df['Leerner se naam'].fillna('')).str.strip()
-    df = df.rename(columns={
-        'BLOK': 'Block',
-        'Opvoeder betrokke': 'Teacher',
-        'Wat het gebeur': 'Incident',
-        'Kategorie': 'Category'
-    })
-    df['Learner_Full_Name'] = df['Learner_Full_Name'].replace('', 'Onbekend2999')
-    df['Block'] = df['Block'].fillna('Onbekend2999')
-    df['Teacher'] = df['Teacher'].fillna('Onbekend2999')
-    df['Incident'] = df['Incident'].fillna('Onbekend2999')
-    df['Category'] = pd.to_numeric(df['Category'], errors='coerce').fillna(1).astype(int).astype(str)
-    return df[['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category']]
+    try:
+        df = pd.read_csv("learner_list.csv")
+        df.columns = df.columns.str.strip()
+        df['Learner_Full_Name'] = (df['Leerder van'].fillna('') + ' ' + df['Leerner se naam'].fillna('')).str.strip()
+        df = df.rename(columns={
+            'BLOK': 'Block',
+            'Opvoeder betrokke': 'Teacher',
+            'Wat het gebeur': 'Incident',
+            'Kategorie': 'Category'
+        })
+        df['Learner_Full_Name'] = df['Learner_Full_Name'].replace('', 'Onbekend2999')
+        df['Block'] = df['Block'].fillna('Onbekend2999')
+        df['Teacher'] = df['Teacher'].fillna('Onbekend2999')
+        df['Incident'] = df['Incident'].fillna('Onbekend2999')
+        df['Category'] = pd.to_numeric(df['Category'], errors='coerce').fillna(1).astype(int).astype(str)
+        return df[['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category']]
+    except FileNotFoundError:
+        st.error("learner_list.csv not found. Please ensure the file exists.")
+        return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category'])
 
 # Load or initialize incident log
 def load_incident_log():
@@ -405,13 +409,24 @@ def load_incident_log():
 
 # Update incident log to GitHub
 def update_incident_log_to_github(repo_name, file_path, github_token):
+    st.write(f"Debug: Attempting to update repo={repo_name}, file={file_path}")
     try:
+        # Validate inputs
+        if not repo_name or not file_path or not github_token:
+            return False, "Error: Missing GitHub configuration (token, repo, or file path)."
+        
         # Initialize GitHub client
         g = Github(github_token)
         repo = g.get_repo(repo_name)
+        st.write(f"Debug: Successfully accessed repository {repo_name}")
         
         # Read local incident_log.csv
-        incident_log = pd.read_csv("incident_log.csv")
+        try:
+            incident_log = pd.read_csv("incident_log.csv")
+        except FileNotFoundError:
+            st.warning("Local incident_log.csv not found. Creating empty file.")
+            incident_log = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
+            incident_log.to_csv("incident_log.csv", index=False)
         
         # Convert DataFrame to CSV string
         csv_buffer = io.StringIO()
@@ -421,6 +436,7 @@ def update_incident_log_to_github(repo_name, file_path, github_token):
         try:
             # Get the existing file from GitHub
             file_content = repo.get_contents(file_path)
+            st.write(f"Debug: Found existing file at {file_path}, SHA={file_content.sha}")
             # Update the file
             repo.update_file(
                 path=file_path,
@@ -428,20 +444,25 @@ def update_incident_log_to_github(repo_name, file_path, github_token):
                 content=csv_content.encode('utf-8'),
                 sha=file_content.sha
             )
+            st.write("Debug: File updated successfully")
         except Exception as e:
             # If file doesn't exist, create it
             if "404" in str(e):
+                st.write(f"Debug: File {file_path} not found, creating new file")
                 repo.create_file(
                     path=file_path,
                     message="Create incident log",
                     content=csv_content.encode('utf-8')
                 )
+                st.write("Debug: File created successfully")
             else:
                 raise e
                 
         return True, "Incident log successfully updated on GitHub!"
     except Exception as e:
-        return False, f"Error updating incident log to GitHub: {str(e)}"
+        error_message = f"Error updating incident log to GitHub: {str(e)}"
+        st.write(f"Debug: {error_message}")
+        return False, error_message
 
 # Save incident to log
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
@@ -461,14 +482,14 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     
     # Update GitHub after saving locally
     github_token = st.secrets.get("GITHUB_TOKEN", None)
-    if github_token:
-        repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")
-        file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")
+    repo_name = st.secrets.get("GITHUB_REPO", None)
+    file_path = st.secrets.get("GITHUB_FILE_PATH", None)
+    if github_token and repo_name and file_path:
         success, message = update_incident_log_to_github(repo_name, file_path, github_token)
         if not success:
             st.warning(message)
     else:
-        st.warning("GitHub token not configured. Incident saved locally only.")
+        st.warning("GitHub configuration missing (token, repo, or file path). Incident saved locally only.")
     
     return incident_log
 
@@ -483,16 +504,18 @@ def remove_incident(display_index):
         
         # Update GitHub after removing locally
         github_token = st.secrets.get("GITHUB_TOKEN", None)
-        if github_token:
-            repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")
-            file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")
+        repo_name = st.secrets.get("GITHUB_REPO", None)
+        file_path = st.secrets.get("GITHUB_FILE_PATH", None)
+        if github_token and repo_name and file_path:
             success, message = update_incident_log_to_github(repo_name, file_path, github_token)
             if not success:
                 st.warning(message)
         else:
-            st.warning("GitHub token not configured. Incident removed locally only.")
+            st.warning("GitHub configuration missing (token, repo, or file path). Incident removed locally only.")
         
         return incident_log
+    else:
+        st.error(f"Invalid index {display_index}. Please select a valid incident index.")
     return incident_log
 
 # Generate Word document for all incidents
