@@ -447,7 +447,69 @@ def clear_incident(index):
         logger.warning(f"Invalid index {index} for clearing")
         st.warning(f"Ongeldige indeks {index} vir verwydering.")
     return incident_log
+# Push to GitHub
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        repo = g.get_repo("arnoldtRealph/insident")
+        with open("incident_log.csv", "rb") as file:
+            content = file.read()
+        repo_path = "incident_log.csv"
+        try:
+            contents = repo.get_contents(repo_path, ref="master")
+            repo.update_file(
+                path=repo_path,
+                message="Updated incident_log.csv with new incident",
+                content=content,
+                sha=contents.sha,
+                branch="master"
+            )
+        except:
+            repo.create_file(
+                path=repo_path,
+                message="Created incident_log.csv with new incident",
+                content=content,
+                branch="master"
+            )
+    except Exception as e:
+        st.error(f"Kon nie na GitHub stoot nie: {e}")
 
+    return incident_log
+
+# Clear a single incident and push to GitHub
+def clear_incident(index):
+    incident_log = load_incident_log()
+    if index in incident_log.index:
+        incident_log = incident_log.drop(index)
+        incident_log.to_csv("incident_log.csv", index=False)
+
+        # Push to GitHub
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/insident")
+            with open("incident_log.csv", "rb") as file:
+                content = file.read()
+            repo_path = "incident_log.csv"
+            try:
+                contents = repo.get_contents(repo_path, ref="master")
+                repo.update_file(
+                    path=repo_path,
+                    message="Updated incident_log.csv after clearing incident",
+                    content=content,
+                    sha=contents.sha,
+                    branch="master"
+                )
+            except:
+                repo.create_file(
+                    path=repo_path,
+                    message="Created incident_log.csv after clearing incident",
+                    content=content,
+                    branch="master"
+                )
+        except Exception as e:
+            st.error(f"Kon nie na GitHub stoot nie: {e}")
+
+        return incident_log
+    return incident_log
 # Generate Word document for all incidents
 def generate_word_report(df):
     doc = Document()
