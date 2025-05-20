@@ -447,73 +447,12 @@ def clear_incident(index):
         logger.warning(f"Invalid index {index} for clearing")
         st.warning(f"Ongeldige indeks {index} vir verwydering.")
     return incident_log
-# Push to GitHub
-    try:
-        g = Github(st.secrets["GITHUB_TOKEN"])
-        repo = g.get_repo("arnoldtRealph/hostel")
-        with open("incident_log.csv", "rb") as file:
-            content = file.read()
-        repo_path = "incident_log.csv"
-        try:
-            contents = repo.get_contents(repo_path, ref="master")
-            repo.update_file(
-                path=repo_path,
-                message="Updated incident_log.csv with new incident",
-                content=content,
-                sha=contents.sha,
-                branch="master"
-            )
-        except:
-            repo.create_file(
-                path=repo_path,
-                message="Created incident_log.csv with new incident",
-                content=content,
-                branch="master"
-            )
-    except Exception as e:
-        st.error(f"Kon nie na GitHub stoot nie: {e}")
 
-    return incident_log
-
-# Clear a single incident and push to GitHub
-def clear_incident(index):
-    incident_log = load_incident_log()
-    if index in incident_log.index:
-        incident_log = incident_log.drop(index)
-        incident_log.to_csv("incident_log.csv", index=False)
-
-        # Push to GitHub
-        try:
-            g = Github(st.secrets["GITHUB_TOKEN"])
-            repo = g.get_repo("arnoldtRealph/hostel")
-            with open("incident_log.csv", "rb") as file:
-                content = file.read()
-            repo_path = "incident_log.csv"
-            try:
-                contents = repo.get_contents(repo_path, ref="master")
-                repo.update_file(
-                    path=repo_path,
-                    message="Updated incident_log.csv after clearing incident",
-                    content=content,
-                    sha=contents.sha,
-                    branch="master"
-                )
-            except:
-                repo.create_file(
-                    path=repo_path,
-                    message="Created incident_log.csv after clearing incident",
-                    content=content,
-                    branch="master"
-                )
-        except Exception as e:
-            st.error(f"Kon nie na GitHub stoot nie: {e}")
-
-        return incident_log
-    return incident_log
-# Generate Word document for all incidents
-def generate_word_report(df):
+# Generate Word document for incidents
+def generate_word_report(df, learner_name=None):
     doc = Document()
-    doc.add_heading('Hostel Insident Verslag', 0)
+    title = f'Hostel Insident Verslag - {learner_name}' if learner_name else 'Hostel Insident Verslag'
+    doc.add_heading(title, 0)
 
     doc.add_heading('Insident Besonderhede', level=1)
     table = doc.add_table(rows=1, cols=len(df.columns))
@@ -732,6 +671,39 @@ if not incident_log.empty:
     )
 else:
     st.write("Geen insidente in die log nie.")
+
+# Filter by learner
+st.header("Filter volgens Leerder")
+with st.container():
+    st.markdown('<div class="input-label">Kies Leerder</div>', unsafe_allow_html=True)
+    learner_filter = st.selectbox("", options=['Kies'] + sorted(incident_log['Learner_Full_Name'].unique()), key="learner_filter")
+    
+    if learner_filter != 'Kies':
+        filtered_log = incident_log[incident_log['Learner_Full_Name'] == learner_filter].copy()
+        filtered_log.index = filtered_log.index + 1
+        st.subheader(f"Insidente vir {learner_filter}")
+        st.dataframe(
+            filtered_log,
+            use_container_width=True,
+            column_config={
+                "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
+                "Block": st.column_config.TextColumn("Blok", width="small"),
+                "Teacher": st.column_config.TextColumn("Toesighouer", width="medium"),
+                "Incident": st.column_config.TextColumn("Insident", width="medium"),
+                "Category": st.column_config.TextColumn("Kategorie", width="small"),
+                "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
+                "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
+            }
+        )
+        st.download_button(
+            label=f"Laai {learner_filter} se Verslag af",
+            data=generate_word_report(filtered_log, learner_filter),
+            file_name=f"insident_verslag_{learner_filter.replace(' ', '_')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="learner_report_download"
+        )
+    else:
+        st.write("Kies 'n leerder om insidente te sien.")
 
 # Today's incidents
 st.header("Vandag se Insidente")
