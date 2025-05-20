@@ -8,9 +8,7 @@ from docx import Document
 from docx.shared import Inches
 import io
 from matplotlib.ticker import MaxNLocator
-from github import Github, GithubException
-import os
-import time
+from github import Github
 import logging
 
 # Configure logging for Streamlit Cloud logs (not UI)
@@ -414,90 +412,6 @@ def load_incident_log():
         logger.warning("incident_log.csv not found or empty. Returning empty DataFrame.")
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
-# Update incident log to GitHub
-def update_incident_log_to_github(github_token):
-    try:
-        if not github_token:
-            logger.warning("Missing GitHub token.")
-            return False, "Missing GitHub token."
-        
-        # Initialize GitHub client and validate token
-        g = Github(github_token)
-        try:
-            user = g.get_user()
-            logger.info(f"Authenticated as GitHub user: {user.login}")
-        except GithubException as e:
-            logger.error(f"Token authentication failed: {str(e)}")
-            return False, f"Token authentication failed: {str(e)}"
-        
-        # Access repository
-        try:
-            repo = g.get_repo("arnoldtRealph/insident")
-            logger.info(f"Accessed repository: arnoldtRealph/insident")
-        except GithubException as e:
-            logger.error(f"Failed to access repository: {str(e)}")
-            return False, f"Failed to access repository: {str(e)}"
-        
-        # Get default branch
-        default_branch = repo.default_branch
-        logger.info(f"Using default branch: {default_branch}")
-        
-        # Read local incident_log.csv as binary
-        try:
-            with open("incident_log.csv", "rb") as file:
-                content = file.read()
-            logger.info(f"Read incident_log.csv, size: {len(content)} bytes")
-            if len(content) == 0:
-                logger.warning("incident_log.csv is empty")
-                return False, "incident_log.csv is empty"
-        except FileNotFoundError:
-            logger.warning("Local incident_log.csv not found. Creating empty file.")
-            incident_log = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
-            incident_log.to_csv("incident_log.csv", index=False)
-            with open("incident_log.csv", "rb") as file:
-                content = file.read()
-            logger.info(f"Created empty incident_log.csv, size: {len(content)} bytes")
-        
-        repo_path = "incident_log.csv"
-        for attempt in range(2):
-            try:
-                try:
-                    contents = repo.get_contents(repo_path, ref=default_branch)
-                    logger.info(f"Found existing file at {repo_path}, SHA={contents.sha}")
-                    repo.update_file(
-                        path=repo_path,
-                        message="Updated incident_log.csv from app",
-                        content=content,
-                        sha=contents.sha,
-                        branch=default_branch
-                    )
-                    logger.info("Incident log updated on GitHub")
-                    return True, "Incident log updated on GitHub!"
-                except GithubException as e:
-                    if e.status == 404:
-                        logger.info(f"File {repo_path} not found, creating new file")
-                        repo.create_file(
-                            path=repo_path,
-                            message="Created incident_log.csv from app",
-                            content=content,
-                            branch=default_branch
-                        )
-                        logger.info("Incident log created on GitHub")
-                        return True, "Incident log created on GitHub!"
-                    elif e.status in [403, 409]:
-                        logger.error(f"GitHub update failed with status {e.status}: {str(e)}")
-                        return False, f"GitHub update failed: {str(e)}"
-                    else:
-                        raise e
-            except GithubException as e:
-                logger.error(f"GitHub attempt {attempt + 1} failed: {str(e)}")
-                if attempt == 1:
-                    return False, f"GitHub error: {str(e)}"
-                time.sleep(1)
-    except Exception as e:
-        logger.error(f"Unexpected error in GitHub update: {str(e)}")
-        return False, f"Unexpected error: {str(e)}"
-
 # Save incident to log
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
     if not all([learner_full_name != 'Kies', block != 'Kies', teacher != 'Kies', incident != 'Kies', category != 'Kies', comment]):
@@ -520,16 +434,34 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log.to_csv("incident_log.csv", index=False)
     logger.info("Incident saved locally to incident_log.csv")
     
-    # Attempt GitHub update with feedback
-    github_token = st.secrets.get("GITHUB_TOKEN", None)
-    if github_token:
-        success, message = update_incident_log_to_github(github_token)
-        if success:
-            st.success(message)
-        else:
-            st.error(f"Kon nie insident log na GitHub opdateer nie: {message}")
-    else:
-        st.error("Geen GitHub token gevind nie. Kontak asseblief die administrateur.")
+    # Push to GitHub
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        repo = g.get_repo("arnoldtRealph/insident")
+        with open("incident_log.csv", "rb") as file:
+            content = file.read()
+        repo_path = "incident_log.csv"
+        try:
+            contents = repo.get_contents(repo_path, ref="master")
+            repo.update_file(
+                path=repo_path,
+                message="Updated incident_log.csv with new incident",
+                content=content,
+                sha=contents.sha,
+                branch="master"
+            )
+            st.success("Incident log updated on GitHub!")
+        except:
+            repo.create_file(
+                path=repo_path,
+                message="Created incident_log.csv with new incident",
+                content=content,
+                branch="master"
+            )
+            st.success("Incident log created on GitHub!")
+    except Exception as e:
+        st.error(f"Kon nie na GitHub stoot nie: {e}")
+        logger.error(f"GitHub push failed: {str(e)}")
     
     return incident_log
 
@@ -542,16 +474,34 @@ def remove_incident(display_index):
         incident_log.to_csv("incident_log.csv", index=False)
         logger.info(f"Incident at index {display_index} removed locally")
         
-        # Attempt GitHub update with feedback
-        github_token = st.secrets.get("GITHUB_TOKEN", None)
-        if github_token:
-            success, message = update_incident_log_to_github(github_token)
-            if success:
-                st.success(message)
-            else:
-                st.error(f"Kon nie insident log na GitHub opdateer nie: {message}")
-        else:
-            st.error("Geen GitHub token gevind nie. Kontak asseblief die administrateur.")
+        # Push to GitHub
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/insident")
+            with open("incident_log.csv", "rb") as file:
+                content = file.read()
+            repo_path = "incident_log.csv"
+            try:
+                contents = repo.get_contents(repo_path, ref="master")
+                repo.update_file(
+                    path=repo_path,
+                    message="Updated incident_log.csv after removing incident",
+                    content=content,
+                    sha=contents.sha,
+                    branch="master"
+                )
+                st.success("Incident log updated on GitHub!")
+            except:
+                repo.create_file(
+                    path=repo_path,
+                    message="Created incident_log.csv after removing incident",
+                    content=content,
+                    branch="master"
+                )
+                st.success("Incident log created on GitHub!")
+        except Exception as e:
+            st.error(f"Kon nie na GitHub stoot nie: {e}")
+            logger.error(f"GitHub push failed: {str(e)}")
         
         return incident_log
     else:
