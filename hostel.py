@@ -414,7 +414,7 @@ def load_incident_log():
         logger.warning("incident_log.csv not found or empty. Returning empty DataFrame.")
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
-# Update incident log to GitHub (adapted from report.py)
+# Update incident log to GitHub
 def update_incident_log_to_github(github_token):
     try:
         if not github_token:
@@ -502,6 +502,7 @@ def update_incident_log_to_github(github_token):
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
     if not all([learner_full_name != 'Kies', block != 'Kies', teacher != 'Kies', incident != 'Kies', category != 'Kies', comment]):
         logger.warning("Incomplete incident fields, saving skipped.")
+        st.warning("Alle velde moet ingevul wees om die insident te stoor.")
         return load_incident_log()
         
     incident_log = load_incident_log()
@@ -519,12 +520,16 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log.to_csv("incident_log.csv", index=False)
     logger.info("Incident saved locally to incident_log.csv")
     
-    # Attempt GitHub update silently
+    # Attempt GitHub update with feedback
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     if github_token:
         success, message = update_incident_log_to_github(github_token)
-        if not success:
-            logger.warning(f"GitHub update failed: {message}")
+        if success:
+            st.success(message)
+        else:
+            st.error(f"Kon nie insident log na GitHub opdateer nie: {message}")
+    else:
+        st.error("Geen GitHub token gevind nie. Kontak asseblief die administrateur.")
     
     return incident_log
 
@@ -537,16 +542,21 @@ def remove_incident(display_index):
         incident_log.to_csv("incident_log.csv", index=False)
         logger.info(f"Incident at index {display_index} removed locally")
         
-        # Attempt GitHub update silently
+        # Attempt GitHub update with feedback
         github_token = st.secrets.get("GITHUB_TOKEN", None)
         if github_token:
             success, message = update_incident_log_to_github(github_token)
-            if not success:
-                logger.warning(f"GitHub update failed: {message}")
+            if success:
+                st.success(message)
+            else:
+                st.error(f"Kon nie insident log na GitHub opdateer nie: {message}")
+        else:
+            st.error("Geen GitHub token gevind nie. Kontak asseblief die administrateur.")
         
         return incident_log
     else:
         logger.warning(f"Invalid index {display_index} for removal")
+        st.warning(f"Ongeldige indeks {display_index} vir verwydering.")
     return incident_log
 
 # Generate Word document for all incidents
