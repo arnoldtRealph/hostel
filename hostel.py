@@ -450,7 +450,7 @@ def clear_incident(index):
 # Push to GitHub
     try:
         g = Github(st.secrets["GITHUB_TOKEN"])
-        repo = g.get_repo("arnoldtRealph/insident")
+        repo = g.get_repo("arnoldtRealph/hostel")
         with open("incident_log.csv", "rb") as file:
             content = file.read()
         repo_path = "incident_log.csv"
@@ -485,7 +485,7 @@ def clear_incident(index):
         # Push to GitHub
         try:
             g = Github(st.secrets["GITHUB_TOKEN"])
-            repo = g.get_repo("arnoldtRealph/insident")
+            repo = g.get_repo("arnoldtRealph/hostel")
             with open("incident_log.csv", "rb") as file:
                 content = file.read()
             repo_path = "incident_log.csv"
