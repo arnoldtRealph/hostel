@@ -8,7 +8,6 @@ from docx import Document
 from docx.shared import Inches
 import io
 from matplotlib.ticker import MaxNLocator
-from github import Github
 import logging
 
 # Configure logging for Streamlit Cloud logs (not UI)
@@ -434,90 +433,20 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log.to_csv("incident_log.csv", index=False)
     logger.info("Incident saved locally to incident_log.csv")
     
-    # Push to GitHub
-    try:
-        g = Github(st.secrets["GITHUB_TOKEN"])
-        repo = g.get_repo("arnoldtRealph/hostel")
-        with open("incident_log.csv", "rb") as file:
-            content = file.read()
-        repo_path = "incident_log.csv"
-        try:
-            contents = repo.get_contents(repo_path, ref="main")
-            repo.update_file(
-                path=repo_path,
-                message="Updated incident_log.csv with new incident",
-                content=content,
-                sha=contents.sha,
-                branch="main"
-            )
-            st.success("Incident log updated on GitHub!")
-        except:
-            repo.create_file(
-                path=repo_path,
-                message="Created incident_log.csv with new incident",
-                content=content,
-                branch="main"
-            )
-            st.success("Incident log created on GitHub!")
-    except Exception as e:
-        st.error(f"Kon nie na GitHub stoot nie: {e}")
-        logger.error(f"GitHub push failed: {str(e)}")
-    
     return incident_log
 
-# Clear a single incident and push to GitHub
+# Clear a single incident
 def clear_incident(index):
     incident_log = load_incident_log()
     if index in incident_log.index:
         incident_log = incident_log.drop(index)
         incident_log.to_csv("incident_log.csv", index=False)
         logger.info(f"Incident at index {index} cleared locally")
-
-        # Push to GitHub
-        try:
-            g = Github(st.secrets["GITHUB_TOKEN"])
-            repo = g.get_repo("arnoldtRealph/hostel")
-            with open("incident_log.csv", "rb") as file:
-                content = file.read()
-            repo_path = "incident_log.csv"
-            try:
-                contents = repo.get_contents(repo_path, ref="main")
-                repo.update_file(
-                    path=repo_path,
-                    message="Updated incident_log.csv after clearing incident",
-                    content=content,
-                    sha=contents.sha,
-                    branch="main"
-                )
-                st.success("Incident log updated on GitHub!")
-            except:
-                repo.create_file(
-                    path=repo_path,
-                    message="Created incident_log.csv after clearing incident",
-                    content=content,
-                    branch="main"
-                )
-                st.success("Incident log created on GitHub!")
-        except Exception as e:
-            st.error(f"Kon nie na GitHub stoot nie: {e}")
-            logger.error(f"GitHub push failed: {str(e)}")
-        
         return incident_log
     else:
         logger.warning(f"Invalid index {index} for clearing")
         st.warning(f"Ongeldige indeks {index} vir verwydering.")
     return incident_log
-
-# Debug GitHub connectivity
-def test_github_connectivity():
-    try:
-        g = Github(st.secrets["GITHUB_TOKEN"])
-        user = g.get_user()
-        repo = g.get_repo("arnoldtRealph/hostel")
-        branch = repo.get_branch("main")
-        return f"Verbinding suksesvol! Geauthentiseerde gebruiker: {user.login}, Repository: {repo.full_name}, Branch: {branch.name}"
-    except Exception as e:
-        return f"GitHub verbinding misluk: {str(e)}"
 
 # Generate Word document for all incidents
 def generate_word_report(df):
@@ -589,10 +518,6 @@ incident_log = load_incident_log()
 with st.container():
     st.title("HOSTEL INSIDENT VERSLAG")
     st.subheader("Hoërskool Saul Damon Hostel")
-
-# Debug GitHub connectivity
-st.header("GitHub Verbinding Toets")
-st.write(test_github_connectivity())
 
 # Initialize session state for sanction notifications
 if 'sanction_popups' not in st.session_state:
