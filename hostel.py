@@ -8,12 +8,12 @@ from docx import Document
 from docx.shared import Inches
 import io
 from matplotlib.ticker import MaxNLocator
-from github import Github
+from github import Github, GithubException
 import os
 import time
 import logging
 
-# Configure logging for debugging (visible in Streamlit Cloud logs, not UI)
+# Configure logging for Streamlit Cloud logs (not UI)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -421,16 +421,35 @@ def update_incident_log_to_github(github_token):
             logger.warning("Missing GitHub token.")
             return False, "Missing GitHub token."
         
+        # Initialize GitHub client and validate token
         g = Github(github_token)
-        repo = g.get_repo("arnoldtRealph/insident")
+        try:
+            user = g.get_user()
+            logger.info(f"Authenticated as GitHub user: {user.login}")
+        except GithubException as e:
+            logger.error(f"Token authentication failed: {str(e)}")
+            return False, f"Token authentication failed: {str(e)}"
+        
+        # Access repository
+        try:
+            repo = g.get_repo("arnoldtRealph/insident")
+            logger.info(f"Accessed repository: arnoldtRealph/insident")
+        except GithubException as e:
+            logger.error(f"Failed to access repository: {str(e)}")
+            return False, f"Failed to access repository: {str(e)}"
+        
         # Get default branch
         default_branch = repo.default_branch
+        logger.info(f"Using default branch: {default_branch}")
         
         # Read local incident_log.csv as binary
         try:
             with open("incident_log.csv", "rb") as file:
                 content = file.read()
             logger.info(f"Read incident_log.csv, size: {len(content)} bytes")
+            if len(content) == 0:
+                logger.warning("incident_log.csv is empty")
+                return False, "incident_log.csv is empty"
         except FileNotFoundError:
             logger.warning("Local incident_log.csv not found. Creating empty file.")
             incident_log = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
@@ -440,7 +459,7 @@ def update_incident_log_to_github(github_token):
             logger.info(f"Created empty incident_log.csv, size: {len(content)} bytes")
         
         repo_path = "incident_log.csv"
-        for attempt in range(2):  # Retry once
+        for attempt in range(2):
             try:
                 try:
                     contents = repo.get_contents(repo_path, ref=default_branch)
@@ -454,8 +473,8 @@ def update_incident_log_to_github(github_token):
                     )
                     logger.info("Incident log updated on GitHub")
                     return True, "Incident log updated on GitHub!"
-                except Exception as e:
-                    if "404" in str(e):
+                except GithubException as e:
+                    if e.status == 404:
                         logger.info(f"File {repo_path} not found, creating new file")
                         repo.create_file(
                             path=repo_path,
@@ -465,22 +484,25 @@ def update_incident_log_to_github(github_token):
                         )
                         logger.info("Incident log created on GitHub")
                         return True, "Incident log created on GitHub!"
+                    elif e.status in [403, 409]:
+                        logger.error(f"GitHub update failed with status {e.status}: {str(e)}")
+                        return False, f"GitHub update failed: {str(e)}"
                     else:
                         raise e
-            except Exception as e:
+            except GithubException as e:
                 logger.error(f"GitHub attempt {attempt + 1} failed: {str(e)}")
                 if attempt == 1:
                     return False, f"GitHub error: {str(e)}"
-                time.sleep(1)  # Wait before retry
+                time.sleep(1)
     except Exception as e:
-        logger.error(f"Failed to update GitHub: {str(e)}")
-        return False, f"Failed to update GitHub: {str(e)}"
+        logger.error(f"Unexpected error in GitHub update: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
 
 # Save incident to log
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
     if not all([learner_full_name != 'Kies', block != 'Kies', teacher != 'Kies', incident != 'Kies', category != 'Kies', comment]):
         logger.warning("Incomplete incident fields, saving skipped.")
-        return load_incident_log()  # Silently skip
+        return load_incident_log()
         
     incident_log = load_incident_log()
     sa_tz = pytz.timezone('Africa/Johannesburg')
