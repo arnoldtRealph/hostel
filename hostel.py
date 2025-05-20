@@ -204,10 +204,9 @@ st.markdown("""
         }
         .stSelectbox > div > div {
             min-height: 48px;
-            color: #00e5ff !important; /* Brighter cyan for selected value */
+            color: #00e5ff !important;
             background: rgba(15, 23, 42, 0.9);
         }
-        /* Dropdown menu items */
         .stSelectbox [data-baseweb="select"] ul {
             background: #1e293b !important;
             border: 1px solid #0ea5e9 !important;
@@ -215,17 +214,17 @@ st.markdown("""
             box-shadow: 0 4px 12px rgba(0, 229, 255, 0.2);
         }
         .stSelectbox [data-baseweb="select"] li {
-            color: #e2e8f0 !important; /* Light gray for dropdown options */
+            color: #e2e8f0 !important;
             padding: 10px;
             transition: background 0.2s ease;
         }
         .stSelectbox [data-baseweb="select"] li:hover {
             background: #0ea5e9 !important;
-            color: #ffffff !important; /* White text on hover for contrast */
+            color: #ffffff !important;
         }
         .stSelectbox [data-baseweb="select"] li[aria-selected="true"] {
             background: #38bdf8 !important;
-            color: #ffffff !important; /* White text for selected item */
+            color: #ffffff !important;
             font-weight: 600;
         }
 
@@ -404,46 +403,45 @@ def load_incident_log():
     except (FileNotFoundError, pd.errors.EmptyDataError):
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
-# Populate incident log from GitHub
-def populate_incident_log_from_github(repo_name, file_path, github_token):
+# Update incident log to GitHub
+def update_incident_log_to_github(repo_name, file_path, github_token):
     try:
         # Initialize GitHub client
         g = Github(github_token)
         repo = g.get_repo(repo_name)
         
-        # Get the file from GitHub
-        file_content = repo.get_contents(file_path)
-        content = base64.b64decode(file_content.content).decode('utf-8')
+        # Read local incident_log.csv
+        incident_log = pd.read_csv("incident_log.csv")
         
-        # Read CSV content into DataFrame
-        df = pd.read_csv(io.StringIO(content))
-        df.columns = df.columns.str.strip()
-        column_mapping = {
-            'BLOK': 'Block',
-            'Opvoeder betrokke': 'Teacher',
-            'Wat het gebeur': 'Incident',
-            'Kategorie': 'Category',
-            'Leerder Naam': 'Learner_Full_Name',
-            'Kommentaar': 'Comment',
-            'Datum': 'Date'
-        }
-        df = df.rename(columns=column_mapping)
-        expected_columns = ['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date']
-        for col in expected_columns:
-            if col not in df.columns:
-                df[col] = 'Onbekend2999' if col != 'Date' else pd.NaT
-        df['Category'] = pd.to_numeric(df['Category'], errors='coerce').fillna(1).astype(int).astype(str)
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.date
+        # Convert DataFrame to CSV string
+        csv_buffer = io.StringIO()
+        incident_log.to_csv(csv_buffer, index=False)
+        csv_content = csv_buffer.getvalue()
         
-        # Save to local incident_log.csv
-        df[expected_columns].to_csv("incident_log.csv", index=False)
-        # Update the GitHub CSV file
-        with open("incident_log.csv", "rb") as file:
-            content = file.read()
-        repo.update_file(file_path, "Update incident log from app", content, file_content.sha)
-        return df[expected_columns], "Incident log successfully updated on GitHub!"
+        try:
+            # Get the existing file from GitHub
+            file_content = repo.get_contents(file_path)
+            # Update the file
+            repo.update_file(
+                path=file_path,
+                message="Update incident log from app",
+                content=csv_content.encode('utf-8'),
+                sha=file_content.sha
+            )
+        except Exception as e:
+            # If file doesn't exist, create it
+            if "404" in str(e):
+                repo.create_file(
+                    path=file_path,
+                    message="Create incident log",
+                    content=csv_content.encode('utf-8')
+                )
+            else:
+                raise e
+                
+        return True, "Incident log successfully updated on GitHub!"
     except Exception as e:
-        return None, f"Error updating incident log: {str(e)}"
+        return False, f"Error updating incident log to GitHub: {str(e)}"
 
 # Save incident to log
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
@@ -460,12 +458,18 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     })
     incident_log = pd.concat([incident_log, new_incident], ignore_index=True)
     incident_log.to_csv("incident_log.csv", index=False)
+    
     # Update GitHub after saving locally
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     if github_token:
-        repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")  # Replace with your repo
-        file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")  # Replace with your file path
-        updated_log, message = populate_incident_log_from_github(repo_name, file_path, github_token)
+        repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")
+        file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")
+        success, message = update_incident_log_to_github(repo_name, file_path, github_token)
+        if not success:
+            st.warning(message)
+    else:
+        st.warning("GitHub token not configured. Incident saved locally only.")
+    
     return incident_log
 
 # Remove incident from log
@@ -476,12 +480,18 @@ def remove_incident(display_index):
     if internal_index in incident_log.index:
         incident_log = incident_log.drop(internal_index).reset_index(drop=True)
         incident_log.to_csv("incident_log.csv", index=False)
+        
         # Update GitHub after removing locally
         github_token = st.secrets.get("GITHUB_TOKEN", None)
         if github_token:
-            repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")  # Replace with your repo
-            file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")  # Replace with your file path
-            updated_log, message = populate_incident_log_from_github(repo_name, file_path, github_token)
+            repo_name = st.secrets.get("GITHUB_REPO", "default_username/default_repo")
+            file_path = st.secrets.get("GITHUB_FILE_PATH", "data/incident_log.csv")
+            success, message = update_incident_log_to_github(repo_name, file_path, github_token)
+            if not success:
+                st.warning(message)
+        else:
+            st.warning("GitHub token not configured. Incident removed locally only.")
+        
         return incident_log
     return incident_log
 
