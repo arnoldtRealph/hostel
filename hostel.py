@@ -437,18 +437,18 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     # Push to GitHub
     try:
         g = Github(st.secrets["GITHUB_TOKEN"])
-        repo = g.get_repo("arnoldtRealph/insident")
+        repo = g.get_repo("arnoldtRealph/hostel")
         with open("incident_log.csv", "rb") as file:
             content = file.read()
         repo_path = "incident_log.csv"
         try:
-            contents = repo.get_contents(repo_path, ref="master")
+            contents = repo.get_contents(repo_path, ref="main")
             repo.update_file(
                 path=repo_path,
                 message="Updated incident_log.csv with new incident",
                 content=content,
                 sha=contents.sha,
-                branch="master"
+                branch="main"
             )
             st.success("Incident log updated on GitHub!")
         except:
@@ -456,7 +456,7 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
                 path=repo_path,
                 message="Created incident_log.csv with new incident",
                 content=content,
-                branch="master"
+                branch="main"
             )
             st.success("Incident log created on GitHub!")
     except Exception as e:
@@ -465,38 +465,37 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     
     return incident_log
 
-# Remove incident from log
-def remove_incident(display_index):
+# Clear a single incident and push to GitHub
+def clear_incident(index):
     incident_log = load_incident_log()
-    internal_index = display_index - 1
-    if internal_index in incident_log.index:
-        incident_log = incident_log.drop(internal_index).reset_index(drop=True)
+    if index in incident_log.index:
+        incident_log = incident_log.drop(index)
         incident_log.to_csv("incident_log.csv", index=False)
-        logger.info(f"Incident at index {display_index} removed locally")
-        
+        logger.info(f"Incident at index {index} cleared locally")
+
         # Push to GitHub
         try:
             g = Github(st.secrets["GITHUB_TOKEN"])
-            repo = g.get_repo("arnoldtRealph/insident")
+            repo = g.get_repo("arnoldtRealph/hostel")
             with open("incident_log.csv", "rb") as file:
                 content = file.read()
             repo_path = "incident_log.csv"
             try:
-                contents = repo.get_contents(repo_path, ref="master")
+                contents = repo.get_contents(repo_path, ref="main")
                 repo.update_file(
                     path=repo_path,
-                    message="Updated incident_log.csv after removing incident",
+                    message="Updated incident_log.csv after clearing incident",
                     content=content,
                     sha=contents.sha,
-                    branch="master"
+                    branch="main"
                 )
                 st.success("Incident log updated on GitHub!")
             except:
                 repo.create_file(
                     path=repo_path,
-                    message="Created incident_log.csv after removing incident",
+                    message="Created incident_log.csv after clearing incident",
                     content=content,
-                    branch="master"
+                    branch="main"
                 )
                 st.success("Incident log created on GitHub!")
         except Exception as e:
@@ -505,9 +504,20 @@ def remove_incident(display_index):
         
         return incident_log
     else:
-        logger.warning(f"Invalid index {display_index} for removal")
-        st.warning(f"Ongeldige indeks {display_index} vir verwydering.")
+        logger.warning(f"Invalid index {index} for clearing")
+        st.warning(f"Ongeldige indeks {index} vir verwydering.")
     return incident_log
+
+# Debug GitHub connectivity
+def test_github_connectivity():
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        user = g.get_user()
+        repo = g.get_repo("arnoldtRealph/hostel")
+        branch = repo.get_branch("main")
+        return f"Verbinding suksesvol! Geauthentiseerde gebruiker: {user.login}, Repository: {repo.full_name}, Branch: {branch.name}"
+    except Exception as e:
+        return f"GitHub verbinding misluk: {str(e)}"
 
 # Generate Word document for all incidents
 def generate_word_report(df):
@@ -579,6 +589,10 @@ incident_log = load_incident_log()
 with st.container():
     st.title("HOSTEL INSIDENT VERSLAG")
     st.subheader("Hoërskool Saul Damon Hostel")
+
+# Debug GitHub connectivity
+st.header("GitHub Verbinding Toets")
+st.write(test_github_connectivity())
 
 # Initialize session state for sanction notifications
 if 'sanction_popups' not in st.session_state:
@@ -714,11 +728,12 @@ if not incident_log.empty:
         }
     )
     
-    # Remove incident section
+    # Clear incident section
     st.subheader("Verwyder Insident")
-    incident_index = st.number_input("Voer die indeks van die insident in om te verwyder", min_value=1, max_value=len(incident_log), step=1)
-    if st.button("Verwyder Insident", key="remove_incident", help="Klik om die geselekteerde insident te verwyder"):
-        incident_log = remove_incident(incident_index)
+    incident_index = st.number_input("Voer die indeks van die insident in om te verwyder (1-gebaseer)", min_value=1, max_value=len(incident_log), step=1)
+    if st.button("Verwyder Insident", key="clear_incident", help="Klik om die geselekteerde insident te verwyder"):
+        internal_index = incident_index - 1  # Convert to 0-based index
+        incident_log = clear_incident(internal_index)
         st.success(f"Insident by indeks {incident_index} suksesvol verwyder!")
         st.rerun()
     
