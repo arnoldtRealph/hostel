@@ -9,7 +9,7 @@ from docx.shared import Inches
 import io
 from matplotlib.ticker import MaxNLocator
 from github import Github
-import base64
+import os
 
 # Set seaborn style for professional charts
 sns.set_style("whitegrid")
@@ -407,52 +407,53 @@ def load_incident_log():
     except (FileNotFoundError, pd.errors.EmptyDataError):
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
-# Update incident log to GitHub
-def update_incident_log_to_github(repo_name, file_path, github_token):
-    st.write(f"Debug: Attempting to update repo={repo_name}, file={file_path}")
+# Update incident log to GitHub (adapted from report.py)
+def update_incident_log_to_github(github_token):
+    st.write("Debug: Attempting to update incident_log.csv to GitHub")
     try:
-        # Validate inputs
-        if not repo_name or not file_path or not github_token:
-            return False, "Error: Missing GitHub configuration (token, repo, or file path)."
+        # Validate token
+        if not github_token:
+            return False, "Error: Missing GitHub token."
         
         # Initialize GitHub client
         g = Github(github_token)
-        repo = g.get_repo(repo_name)
-        st.write(f"Debug: Successfully accessed repository {repo_name}")
+        repo = g.get_repo("arnoldtRealph/insident")
+        st.write("Debug: Successfully accessed repository arnoldtRealph/insident")
         
-        # Read local incident_log.csv
+        # Read local incident_log.csv as binary
         try:
-            incident_log = pd.read_csv("incident_log.csv")
+            with open("incident_log.csv", " coeficientrb") as file:
+                content = file.read()
         except FileNotFoundError:
             st.warning("Local incident_log.csv not found. Creating empty file.")
             incident_log = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
             incident_log.to_csv("incident_log.csv", index=False)
+            with open("incident_log.csv", "rb") as file:
+                content = file.read()
         
-        # Convert DataFrame to CSV string
-        csv_buffer = io.StringIO()
-        incident_log.to_csv(csv_buffer, index=False)
-        csv_content = csv_buffer.getvalue()
-        
+        repo_path = "incident_log.csv"
         try:
-            # Get the existing file from GitHub
-            file_content = repo.get_contents(file_path)
-            st.write(f"Debug: Found existing file at {file_path}, SHA={file_content.sha}")
+            # Get the existing file
+            contents = repo.get_contents(repo_path, ref="master")
+            st.write(f"Debug: Found existing file at {repo_path}, SHA={contents.sha}")
             # Update the file
             repo.update_file(
-                path=file_path,
-                message="Update incident log from app",
-                content=csv_content.encode('utf-8'),
-                sha=file_content.sha
+                path=repo_path,
+                message="Updated incident_log.csv from app",
+                content=content,
+                sha=contents.sha,
+                branch="master"
             )
             st.write("Debug: File updated successfully")
         except Exception as e:
             # If file doesn't exist, create it
             if "404" in str(e):
-                st.write(f"Debug: File {file_path} not found, creating new file")
+                st.write(f"Debug: File {repo_path} not found, creating new file")
                 repo.create_file(
-                    path=file_path,
-                    message="Create incident log",
-                    content=csv_content.encode('utf-8')
+                    path=repo_path,
+                    message="Created incident_log.csv from app",
+                    content=content,
+                    branch="master"
                 )
                 st.write("Debug: File created successfully")
             else:
@@ -482,14 +483,12 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     
     # Update GitHub after saving locally
     github_token = st.secrets.get("GITHUB_TOKEN", None)
-    repo_name = st.secrets.get("GITHUB_REPO", None)
-    file_path = st.secrets.get("GITHUB_FILE_PATH", None)
-    if github_token and repo_name and file_path:
-        success, message = update_incident_log_to_github(repo_name, file_path, github_token)
+    if github_token:
+        success, message = update_incident_log_to_github(github_token)
         if not success:
             st.warning(message)
     else:
-        st.warning("GitHub configuration missing (token, repo, or file path). Incident saved locally only.")
+        st.warning("GitHub token missing. Incident saved locally only.")
     
     return incident_log
 
@@ -504,14 +503,12 @@ def remove_incident(display_index):
         
         # Update GitHub after removing locally
         github_token = st.secrets.get("GITHUB_TOKEN", None)
-        repo_name = st.secrets.get("GITHUB_REPO", None)
-        file_path = st.secrets.get("GITHUB_FILE_PATH", None)
-        if github_token and repo_name and file_path:
-            success, message = update_incident_log_to_github(repo_name, file_path, github_token)
+        if github_token:
+            success, message = update_incident_log_to_github(github_token)
             if not success:
                 st.warning(message)
         else:
-            st.warning("GitHub configuration missing (token, repo, or file path). Incident removed locally only.")
+            st.warning("GitHub token missing. Incident removed locally only.")
         
         return incident_log
     else:
