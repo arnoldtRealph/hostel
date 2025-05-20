@@ -422,10 +422,10 @@ def update_incident_log_to_github(github_token):
         
         # Read local incident_log.csv as binary
         try:
-            with open("incident_log.csv", " coeficientrb") as file:
+            with open("incident_log.csv", "rb") as file:
                 content = file.read()
         except FileNotFoundError:
-            st.warning("Local incident_log.csv not found. Creating empty file.")
+            st.write("Debug: Local incident_log.csv not found. Creating empty file.")
             incident_log = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
             incident_log.to_csv("incident_log.csv", index=False)
             with open("incident_log.csv", "rb") as file:
@@ -484,11 +484,11 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     # Update GitHub after saving locally
     github_token = st.secrets.get("GITHUB_TOKEN", None)
     if github_token:
-        success, message = update_incident_log_to_github(github_token)
+        success, _ = update_incident_log_to_github(github_token)
         if not success:
-            st.warning(message)
+            st.write("Debug: Incident saved locally, but GitHub update failed.")
     else:
-        st.warning("GitHub token missing. Incident saved locally only.")
+        st.write("Debug: GitHub token missing. Incident saved locally only.")
     
     return incident_log
 
@@ -504,11 +504,11 @@ def remove_incident(display_index):
         # Update GitHub after removing locally
         github_token = st.secrets.get("GITHUB_TOKEN", None)
         if github_token:
-            success, message = update_incident_log_to_github(github_token)
+            success, _ = update_incident_log_to_github(github_token)
             if not success:
-                st.warning(message)
+                st.write("Debug: Incident removed locally, but GitHub update failed.")
         else:
-            st.warning("GitHub token missing. Incident removed locally only.")
+            st.write("Debug: GitHub token missing. Incident removed locally only.")
         
         return incident_log
     else:
