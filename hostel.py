@@ -678,7 +678,7 @@ if not incident_log.empty:
                 st.session_state.sanction_popups[key] = False
                 st.rerun()
     if not any_notifications:
-        st markdown(
+        st.markdown(
             """
             <div style='background: rgba(34, 197, 94, 0.2); padding: 15px; border-radius: 8px; border: 2px solid #34d399;'>
                 <p style='margin: 0; font-size: 0.9rem;'>Geen aktiewe sanksiemeldings nie.</p>
