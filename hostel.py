@@ -9,6 +9,9 @@ from docx.shared import Inches
 import io
 from matplotlib.ticker import MaxNLocator
 import logging
+from github import Github
+import base64
+import os
 
 # Configure logging for Streamlit Cloud logs (not UI)
 logging.basicConfig(level=logging.INFO)
@@ -388,7 +391,24 @@ def load_learner_data():
 # Load or initialize incident log
 def load_incident_log():
     try:
-        df = pd.read_csv("incident_log.csv")
+        # Check if local incident_log.csv exists and is non-empty
+        if os.path.exists("incident_log.csv") and os.path.getsize("incident_log.csv") > 0:
+            df = pd.read_csv("incident_log.csv")
+        else:
+            # Fetch from GitHub
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/hostel")
+            try:
+                contents = repo.get_contents("incident_log.csv", ref="main")
+                content = base64.b64decode(contents.content).decode('utf-8')
+                df = pd.read_csv(io.StringIO(content))
+                # Save locally for future use
+                df.to_csv("incident_log.csv", index=False)
+                logger.info("Incident log fetched from GitHub and saved locally")
+            except:
+                logger.warning("incident_log.csv does not exist in GitHub repository. Initializing empty DataFrame.")
+                df = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
+
         df.columns = df.columns.str.strip()
         column_mapping = {
             'BLOK': 'Block',
@@ -407,8 +427,8 @@ def load_incident_log():
         df['Category'] = pd.to_numeric(df['Category'], errors='coerce').fillna(1).astype(int).astype(str)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.date
         return df[expected_columns]
-    except (FileNotFoundError, pd.errors.EmptyDataError):
-        logger.warning("incident_log.csv not found or empty. Returning empty DataFrame.")
+    except Exception as e:
+        logger.error(f"Error loading incident_log.csv: {e}")
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
 # Save incident to log
@@ -432,7 +452,36 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log = pd.concat([incident_log, new_incident], ignore_index=True)
     incident_log.to_csv("incident_log.csv", index=False)
     logger.info("Incident saved locally to incident_log.csv")
-    
+
+    # Push to GitHub
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        repo = g.get_repo("arnoldtRealph/hostel")
+        with open("incident_log.csv", "rb") as file:
+            content = file.read()
+        repo_path = "incident_log.csv"
+        try:
+            contents = repo.get_contents(repo_path, ref="main")
+            repo.update_file(
+                path=repo_path,
+                message="Updated incident_log.csv with new incident",
+                content=content,
+                sha=contents.sha,
+                branch="main"
+            )
+            logger.info("Incident log updated on GitHub")
+        except:
+            repo.create_file(
+                path=repo_path,
+                message="Created incident_log.csv with new incident",
+                content=content,
+                branch="main"
+            )
+            logger.info("Incident log created on GitHub")
+    except Exception as e:
+        logger.error(f"Failed to push to GitHub: {e}")
+        st.error(f"Kon nie na GitHub stoot nie: {e}")
+
     return incident_log
 
 # Clear a single incident
@@ -442,6 +491,36 @@ def clear_incident(index):
         incident_log = incident_log.drop(index)
         incident_log.to_csv("incident_log.csv", index=False)
         logger.info(f"Incident at index {index} cleared locally")
+
+        # Push to GitHub
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/hostel")
+            with open("incident_log.csv", "rb") as file:
+                content = file.read()
+            repo_path = "incident_log.csv"
+            try:
+                contents = repo.get_contents(repo_path, ref="main")
+                repo.update_file(
+                    path=repo_path,
+                    message="Updated incident_log.csv after clearing incident",
+                    content=content,
+                    sha=contents.sha,
+                    branch="main"
+                )
+                logger.info("Incident log updated on GitHub after clearing")
+            except:
+                repo.create_file(
+                    path=repo_path,
+                    message="Created incident_log.csv after clearing incident",
+                    content=content,
+                    branch="main"
+                )
+                logger.info("Incident log created on GitHub after clearing")
+        except Exception as e:
+            logger.error(f"Failed to push to GitHub: {e}")
+            st.error(f"Kon nie na GitHub stoot nie: {e}")
+
         return incident_log
     else:
         logger.warning(f"Invalid index {index} for clearing")
@@ -599,7 +678,7 @@ if not incident_log.empty:
                 st.session_state.sanction_popups[key] = False
                 st.rerun()
     if not any_notifications:
-        st.markdown(
+        st markdown(
             """
             <div style='background: rgba(34, 197, 94, 0.2); padding: 15px; border-radius: 8px; border: 2px solid #34d399;'>
                 <p style='margin: 0; font-size: 0.9rem;'>Geen aktiewe sanksiemeldings nie.</p>
