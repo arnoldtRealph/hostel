@@ -399,7 +399,7 @@ def load_incident_log():
             g = Github(st.secrets["GITHUB_TOKEN"])
             repo = g.get_repo("arnoldtRealph/hostel")
             try:
-                contents = repo.get_contents("incident_log.csv", ref="main")
+                contents = repo.get_contents("incident_log.csv", ref="master")
                 content = base64.b64decode(contents.content).decode('utf-8')
                 df = pd.read_csv(io.StringIO(content))
                 # Save locally for future use
@@ -461,13 +461,13 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
             content = file.read()
         repo_path = "incident_log.csv"
         try:
-            contents = repo.get_contents(repo_path, ref="main")
+            contents = repo.get_contents(repo_path, ref="master")
             repo.update_file(
                 path=repo_path,
                 message="Updated incident_log.csv with new incident",
                 content=content,
                 sha=contents.sha,
-                branch="main"
+                branch="master"
             )
             logger.info("Incident log updated on GitHub")
         except:
@@ -475,7 +475,7 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
                 path=repo_path,
                 message="Created incident_log.csv with new incident",
                 content=content,
-                branch="main"
+                branch="master"
             )
             logger.info("Incident log created on GitHub")
     except Exception as e:
@@ -500,13 +500,13 @@ def clear_incident(index):
                 content = file.read()
             repo_path = "incident_log.csv"
             try:
-                contents = repo.get_contents(repo_path, ref="main")
+                contents = repo.get_contents(repo_path, ref="master")
                 repo.update_file(
                     path=repo_path,
                     message="Updated incident_log.csv after clearing incident",
                     content=content,
                     sha=contents.sha,
-                    branch="main"
+                    branch="master"
                 )
                 logger.info("Incident log updated on GitHub after clearing")
             except:
@@ -514,7 +514,7 @@ def clear_incident(index):
                     path=repo_path,
                     message="Created incident_log.csv after clearing incident",
                     content=content,
-                    branch="main"
+                    branch="master"
                 )
                 logger.info("Incident log created on GitHub after clearing")
         except Exception as e:
