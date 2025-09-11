@@ -391,18 +391,15 @@ def load_learner_data():
 # Load or initialize incident log
 def load_incident_log():
     try:
-        # Check if local incident_log.csv exists and is non-empty
         if os.path.exists("incident_log.csv") and os.path.getsize("incident_log.csv") > 0:
             df = pd.read_csv("incident_log.csv")
         else:
-            # Fetch from GitHub
             g = Github(st.secrets["GITHUB_TOKEN"])
             repo = g.get_repo("arnoldtRealph/hostel")
             try:
                 contents = repo.get_contents("incident_log.csv", ref="master")
                 content = base64.b64decode(contents.content).decode('utf-8')
                 df = pd.read_csv(io.StringIO(content))
-                # Save locally for future use
                 df.to_csv("incident_log.csv", index=False)
                 logger.info("Incident log fetched from GitHub and saved locally")
             except:
@@ -431,6 +428,43 @@ def load_incident_log():
         logger.error(f"Error loading incident_log.csv: {e}")
         return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Teacher', 'Incident', 'Category', 'Comment', 'Date'])
 
+# Load or initialize general happenings log
+def load_happenings_log():
+    try:
+        if os.path.exists("happenings_log.csv") and os.path.getsize("happenings_log.csv") > 0:
+            df = pd.read_csv("happenings_log.csv")
+        else:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/hostel")
+            try:
+                contents = repo.get_contents("happenings_log.csv", ref="master")
+                content = base64.b64decode(contents.content).decode('utf-8')
+                df = pd.read_csv(io.StringIO(content))
+                df.to_csv("happenings_log.csv", index=False)
+                logger.info("Happenings log fetched from GitHub and saved locally")
+            except:
+                logger.warning("happenings_log.csv does not exist in GitHub repository. Initializing empty DataFrame.")
+                df = pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Event', 'Comment', 'Date'])
+
+        df.columns = df.columns.str.strip()
+        column_mapping = {
+            'Leerder Naam': 'Learner_Full_Name',
+            'BLOK': 'Block',
+            'Gebeurtenis': 'Event',
+            'Kommentaar': 'Comment',
+            'Datum': 'Date'
+        }
+        df = df.rename(columns=column_mapping)
+        expected_columns = ['Learner_Full_Name', 'Block', 'Event', 'Comment', 'Date']
+        for col in expected_columns:
+            if col not in df.columns:
+                df[col] = 'Onbekend2999' if col != 'Date' else pd.NaT
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.date
+        return df[expected_columns]
+    except Exception as e:
+        logger.error(f"Error loading happenings_log.csv: {e}")
+        return pd.DataFrame(columns=['Learner_Full_Name', 'Block', 'Event', 'Comment', 'Date'])
+
 # Save incident to log
 def save_incident(learner_full_name, block, teacher, incident, category, comment):
     if not all([learner_full_name != 'Kies', block != 'Kies', teacher != 'Kies', incident != 'Kies', category != 'Kies', comment]):
@@ -453,7 +487,6 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
     incident_log.to_csv("incident_log.csv", index=False)
     logger.info("Incident saved locally to incident_log.csv")
 
-    # Push to GitHub
     try:
         g = Github(st.secrets["GITHUB_TOKEN"])
         repo = g.get_repo("arnoldtRealph/hostel")
@@ -484,6 +517,56 @@ def save_incident(learner_full_name, block, teacher, incident, category, comment
 
     return incident_log
 
+# Save general happening to log
+def save_happening(learner_full_name, block, event, comment):
+    if not all([learner_full_name != 'Kies', block != 'Kies', event, comment]):
+        logger.warning("Incomplete happening fields, saving skipped.")
+        st.warning("Alle velde moet ingevul wees om die gebeurtenis te stoor.")
+        return load_happenings_log()
+        
+    happenings_log = load_happenings_log()
+    sa_tz = pytz.timezone('Africa/Johannesburg')
+    new_happening = pd.DataFrame({
+        'Learner_Full_Name': [learner_full_name],
+        'Block': [block],
+        'Event': [event],
+        'Comment': [comment],
+        'Date': [datetime.now(sa_tz).date()]
+    })
+    happenings_log = pd.concat([happenings_log, new_happening], ignore_index=True)
+    happenings_log.to_csv("happenings_log.csv", index=False)
+    logger.info("Happening saved locally to happenings_log.csv")
+
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        repo = g.get_repo("arnoldtRealph/hostel")
+        with open("happenings_log.csv", "rb") as file:
+            content = file.read()
+        repo_path = "happenings_log.csv"
+        try:
+            contents = repo.get_contents(repo_path, ref="master")
+            repo.update_file(
+                path=repo_path,
+                message="Updated happenings_log.csv with new happening",
+                content=content,
+                sha=contents.sha,
+                branch="master"
+            )
+            logger.info("Happenings log updated on GitHub")
+        except:
+            repo.create_file(
+                path=repo_path,
+                message="Created happenings_log.csv with new happening",
+                content=content,
+                branch="master"
+            )
+            logger.info("Happenings log created on GitHub")
+    except Exception as e:
+        logger.error(f"Failed to push to GitHub: {e}")
+        st.error(f"Kon nie na GitHub stoot nie: {e}")
+
+    return happenings_log
+
 # Clear a single incident
 def clear_incident(index):
     incident_log = load_incident_log()
@@ -492,7 +575,6 @@ def clear_incident(index):
         incident_log.to_csv("incident_log.csv", index=False)
         logger.info(f"Incident at index {index} cleared locally")
 
-        # Push to GitHub
         try:
             g = Github(st.secrets["GITHUB_TOKEN"])
             repo = g.get_repo("arnoldtRealph/hostel")
@@ -527,63 +609,133 @@ def clear_incident(index):
         st.warning(f"Ongeldige indeks {index} vir verwydering.")
     return incident_log
 
-# Generate Word document for incidents
-def generate_word_report(df, learner_name=None):
+# Clear a single happening
+def clear_happening(index):
+    happenings_log = load_happenings_log()
+    if index in happenings_log.index:
+        happenings_log = happenings_log.drop(index)
+        happenings_log.to_csv("happenings_log.csv", index=False)
+        logger.info(f"Happening at index {index} cleared locally")
+
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo("arnoldtRealph/hostel")
+            with open("happenings_log.csv", "rb") as file:
+                content = file.read()
+            repo_path = "happenings_log.csv"
+            try:
+                contents = repo.get_contents(repo_path, ref="master")
+                repo.update_file(
+                    path=repo_path,
+                    message="Updated happenings_log.csv after clearing happening",
+                    content=content,
+                    sha=contents.sha,
+                    branch="master"
+                )
+                logger.info("Happenings log updated on GitHub after clearing")
+            except:
+                repo.create_file(
+                    path=repo_path,
+                    message="Created happenings_log.csv after clearing happening",
+                    content=content,
+                    branch="master"
+                )
+                logger.info("Happenings log created on GitHub after clearing")
+        except Exception as e:
+            logger.error(f"Failed to push to GitHub: {e}")
+            st.error(f"Kon nie na GitHub stoot nie: {e}")
+
+        return happenings_log
+    else:
+        logger.warning(f"Invalid index {index} for clearing")
+        st.warning(f"Ongeldige indeks {index} vir verwydering.")
+    return happenings_log
+
+# Generate Word document for incidents and happenings
+def generate_word_report(incident_df, happenings_df, learner_name=None):
     doc = Document()
-    title = f'Hostel Insident Verslag - {learner_name}' if learner_name else 'Hostel Insident Verslag'
+    title = f'Hostel Verslag - {learner_name}' if learner_name else 'Hostel Verslag'
     doc.add_heading(title, 0)
 
+    # Incidents Section
     doc.add_heading('Insident Besonderhede', level=1)
-    table = doc.add_table(rows=1, cols=len(df.columns))
-    table.style = 'Table Grid'
-    for i, col in enumerate(df.columns):
-        table.cell(0, i).text = {
-            'Learner_Full_Name': 'Leerder Naam',
-            'Block': 'Blok',
-            'Teacher': 'Toesighouer',
-            'Incident': 'Insident',
-            'Category': 'Kategorie',
-            'Comment': 'Kommentaar',
-            'Date': 'Datum'
-        }.get(col, col)
-    for _, row in df.iterrows():
-        cells = table.add_row().cells
-        for i, col in enumerate(df.columns):
-            cells[i].text = str(row[col]) if col != 'Date' else row[col].strftime("%Y-%m-%d") if pd.notnull(row[col]) else 'Onbekend2999'
+    if not incident_df.empty:
+        table = doc.add_table(rows=1, cols=len(incident_df.columns))
+        table.style = 'Table Grid'
+        for i, col in enumerate(incident_df.columns):
+            table.cell(0, i).text = {
+                'Learner_Full_Name': 'Leerder Naam',
+                'Block': 'Blok',
+                'Teacher': 'Toesighouer',
+                'Incident': 'Insident',
+                'Category': 'Kategorie',
+                'Comment': 'Kommentaar',
+                'Date': 'Datum'
+            }.get(col, col)
+        for _, row in incident_df.iterrows():
+            cells = table.add_row().cells
+            for i, col in enumerate(incident_df.columns):
+                cells[i].text = str(row[col]) if col != 'Date' else row[col].strftime("%Y-%m-%d") if pd.notnull(row[col]) else 'Onbekend2999'
+    else:
+        doc.add_paragraph('Geen insidente gerapporteer nie.')
 
+    # General Happenings Section
+    doc.add_heading('Algemene Gebeurtenisse', level=1)
+    if not happenings_df.empty:
+        table = doc.add_table(rows=1, cols=len(happenings_df.columns))
+        table.style = 'Table Grid'
+        for i, col in enumerate(happenings_df.columns):
+            table.cell(0, i).text = {
+                'Learner_Full_Name': 'Leerder Naam',
+                'Block': 'Blok',
+                'Event': 'Gebeurtenis',
+                'Comment': 'Kommentaar',
+                'Date': 'Datum'
+            }.get(col, col)
+        for _, row in happenings_df.iterrows():
+            cells = table.add_row().cells
+            for i, col in enumerate(happenings_df.columns):
+                cells[i].text = str(row[col]) if col != 'Date' else row[col].strftime("%Y-%m-%d") if pd.notnull(row[col]) else 'Onbekend2999'
+    else:
+        doc.add_paragraph('Geen algemene gebeurtenisse gerapporteer nie.')
+
+    # Analysis Section
     doc.add_heading('Insident Analise', level=1)
 
     # Bar chart: Incidents by Category
-    fig, ax = plt.subplots(figsize=(4, 2.5))
-    category_counts = df['Category'].value_counts().sort_index()
-    sns.barplot(x=category_counts.index, y=category_counts.values, ax=ax, palette='Blues')
-    ax.set_title('Insidente volgens Kategorie', pad=10, fontsize=12, weight='bold')
-    ax.set_xlabel('Kategorie', fontsize=10)
-    ax.set_ylabel('Aantal', fontsize=10)
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.tight_layout(pad=1.0)
-    img_stream = io.BytesIO()
-    plt.savefig(img_stream, format='png', dpi=100, bbox_inches='tight')
-    plt.close()
-    doc.add_picture(img_stream, width=Inches(3.5))
-
-    # Bar chart: Incidents by Block
-    if 'Block' in df.columns:
+    if not incident_df.empty:
         fig, ax = plt.subplots(figsize=(4, 2.5))
-        block_counts = df['Block'].value_counts()
-        sns.barplot(x=block_counts.index, y=block_counts.values, ax=ax, palette='Blues')
-        ax.set_title('Insidente volgens Blok', pad=10, fontsize=12, weight='bold')
-        ax.set_xlabel('Blok', fontsize=10)
+        category_counts = incident_df['Category'].value_counts().sort_index()
+        sns.barplot(x=category_counts.index, y=category_counts.values, ax=ax, palette='Blues')
+        ax.set_title('Insidente volgens Kategorie', pad=10, fontsize=12, weight='bold')
+        ax.set_xlabel('Kategorie', fontsize=10)
         ax.set_ylabel('Aantal', fontsize=10)
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.tick_params(axis='x', rotation=45, labelsize=9)
         plt.tight_layout(pad=1.0)
         img_stream = io.BytesIO()
         plt.savefig(img_stream, format='png', dpi=100, bbox_inches='tight')
         plt.close()
         doc.add_picture(img_stream, width=Inches(3.5))
+
+        # Bar chart: Incidents by Block
+        if 'Block' in incident_df.columns:
+            fig, ax = plt.subplots(figsize=(4, 2.5))
+            block_counts = incident_df['Block'].value_counts()
+            sns.barplot(x=block_counts.index, y=block_counts.values, ax=ax, palette='Blues')
+            ax.set_title('Insidente volgens Blok', pad=10, fontsize=12, weight='bold')
+            ax.set_xlabel('Blok', fontsize=10)
+            ax.set_ylabel('Aantal', fontsize=10)
+            ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+            ax.tick_params(axis='x', rotation=45, labelsize=9)
+            plt.tight_layout(pad=1.0)
+            img_stream = io.BytesIO()
+            plt.savefig(img_stream, format='png', dpi=100, bbox_inches='tight')
+            plt.close()
+            doc.add_picture(img_stream, width=Inches(3.5))
+        else:
+            doc.add_paragraph('Geen Blok-data beskikbaar vir analise nie.')
     else:
-        doc.add_paragraph('Geen Blok-data beskikbaar vir analise nie.')
+        doc.add_paragraph('Geen insident-data beskikbaar vir analise nie.')
 
     doc_stream = io.BytesIO()
     doc.save(doc_stream)
@@ -593,10 +745,11 @@ def generate_word_report(df, learner_name=None):
 # Load data
 learner_df = load_learner_data()
 incident_log = load_incident_log()
+happenings_log = load_happenings_log()
 
 # Main content
 with st.container():
-    st.title("HOSTEL INSIDENT VERSLAG")
+    st.title("HOSTEL INSIDENT EN GEBEURTENIS VERSLAG")
     st.subheader("Hoërskool Saul Damon Hostel")
 
 # Initialize session state for sanction notifications
@@ -713,10 +866,28 @@ with st.container():
         incident_log = save_incident(learner_full_name, block, teacher, incident, category, comment)
         st.success("Insident suksesvol gestoor!")
 
+# Report new general happening
+st.header("Rapporteer Algemene Gebeurtenis")
+with st.container():
+    st.markdown('<div class="input-label">Leerder Naam</div>', unsafe_allow_html=True)
+    happening_learner = st.selectbox("", options=['Kies'] + sorted(learner_df['Learner_Full_Name'].unique()), key="happening_learner")
+    
+    st.markdown('<div class="input-label">Blok</div>', unsafe_allow_html=True)
+    happening_block = st.selectbox("", options=['Kies'] + sorted(learner_df['Block'].unique()), key="happening_block")
+    
+    st.markdown('<div class="input-label">Gebeurtenis</div>', unsafe_allow_html=True)
+    event = st.text_input("", placeholder="Beskryf die gebeurtenis (bv. Siek, na hostel gestuur)", key="event")
+    
+    st.markdown('<div class="input-label">Kommentaar</div>', unsafe_allow_html=True)
+    happening_comment = st.text_area("", placeholder="Tik hier...", key="happening_comment")
+    
+    if st.button("Stoor Gebeurtenis"):
+        happenings_log = save_happening(happening_learner, happening_block, event, happening_comment)
+        st.success("Gebeurtenis suksesvol gestoor!")
+
 # Incident log display
 st.header("Insident Log")
 if not incident_log.empty:
-    # Create a display DataFrame with 1-based index
     display_log = incident_log.copy()
     display_log.index = display_log.index + 1
     st.dataframe(
@@ -733,56 +904,106 @@ if not incident_log.empty:
         }
     )
     
-    # Clear incident section
     st.subheader("Verwyder Insident")
     incident_index = st.number_input("Voer die indeks van die insident in om te verwyder (1-gebaseer)", min_value=1, max_value=len(incident_log), step=1)
     if st.button("Verwyder Insident", key="clear_incident", help="Klik om die geselekteerde insident te verwyder"):
-        internal_index = incident_index - 1  # Convert to 0-based index
+        internal_index = incident_index - 1
         incident_log = clear_incident(internal_index)
         st.success(f"Insident by indeks {incident_index} suksesvol verwyder!")
         st.rerun()
-    
-    st.download_button(
-        label="Laai Verslag af as Word",
-        data=generate_word_report(incident_log),
-        file_name="hostel_insident_verslag.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
 else:
     st.write("Geen insidente in die log nie.")
+
+# General happenings log display
+st.header("Algemene Gebeurtenisse Log")
+if not happenings_log.empty:
+    display_happenings = happenings_log.copy()
+    display_happenings.index = display_happenings.index + 1
+    st.dataframe(
+        display_happenings,
+        use_container_width=True,
+        column_config={
+            "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
+            "Block": st.column_config.TextColumn("Blok", width="small"),
+            "Event": st.column_config.TextColumn("Gebeurtenis", width="medium"),
+            "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
+            "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
+        }
+    )
+    
+    st.subheader("Verwyder Gebeurtenis")
+    happening_index = st.number_input("Voer die indeks van die gebeurtenis in om te verwyder (1-gebaseer)", min_value=1, max_value=len(happenings_log), step=1)
+    if st.button("Verwyder Gebeurtenis", key="clear_happening", help="Klik om die geselekteerde gebeurtenis te verwyder"):
+        internal_index = happening_index - 1
+        happenings_log = clear_happening(internal_index)
+        st.success(f"Gebeurtenis by indeks {happening_index} suksesvol verwyder!")
+        st.rerun()
+else:
+    st.write("Geen algemene gebeurtenisse in die log nie.")
+
+# Download combined report
+st.download_button(
+    label="Laai Volledige Verslag af as Word",
+    data=generate_word_report(incident_log, happenings_log),
+    file_name="hostel_verslag.docx",
+    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
 
 # Filter by learner
 st.header("Filter volgens Leerder")
 with st.container():
     st.markdown('<div class="input-label">Kies Leerder</div>', unsafe_allow_html=True)
-    learner_filter = st.selectbox("", options=['Kies'] + sorted(incident_log['Learner_Full_Name'].unique()), key="learner_filter")
+    learner_filter = st.selectbox("", options=['Kies'] + sorted(set(incident_log['Learner_Full_Name'].unique()).union(happenings_log['Learner_Full_Name'].unique())), key="learner_filter")
     
     if learner_filter != 'Kies':
-        filtered_log = incident_log[incident_log['Learner_Full_Name'] == learner_filter].copy()
-        filtered_log.index = filtered_log.index + 1
+        filtered_incident_log = incident_log[incident_log['Learner_Full_Name'] == learner_filter].copy()
+        filtered_happenings_log = happenings_log[happenings_log['Learner_Full_Name'] == learner_filter].copy()
+        
         st.subheader(f"Insidente vir {learner_filter}")
-        st.dataframe(
-            filtered_log,
-            use_container_width=True,
-            column_config={
-                "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
-                "Block": st.column_config.TextColumn("Blok", width="small"),
-                "Teacher": st.column_config.TextColumn("Toesighouer", width="medium"),
-                "Incident": st.column_config.TextColumn("Insident", width="medium"),
-                "Category": st.column_config.TextColumn("Kategorie", width="small"),
-                "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
-                "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
-            }
-        )
+        if not filtered_incident_log.empty:
+            filtered_incident_log.index = filtered_incident_log.index + 1
+            st.dataframe(
+                filtered_incident_log,
+                use_container_width=True,
+                column_config={
+                    "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
+                    "Block": st.column_config.TextColumn("Blok", width="small"),
+                    "Teacher": st.column_config.TextColumn("Toesighouer", width="medium"),
+                    "Incident": st.column_config.TextColumn("Insident", width="medium"),
+                    "Category": st.column_config.TextColumn("Kategorie", width="small"),
+                    "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
+                    "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
+                }
+            )
+        else:
+            st.write("Geen insidente vir hierdie leerder nie.")
+        
+        st.subheader(f"Algemene Gebeurtenisse vir {learner_filter}")
+        if not filtered_happenings_log.empty:
+            filtered_happenings_log.index = filtered_happenings_log.index + 1
+            st.dataframe(
+                filtered_happenings_log,
+                use_container_width=True,
+                column_config={
+                    "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
+                    "Block": st.column_config.TextColumn("Blok", width="small"),
+                    "Event": st.column_config.TextColumn("Gebeurtenis", width="medium"),
+                    "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
+                    "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
+                }
+            )
+        else:
+            st.write("Geen algemene gebeurtenisse vir hierdie leerder nie.")
+        
         st.download_button(
             label=f"Laai {learner_filter} se Verslag af",
-            data=generate_word_report(filtered_log, learner_filter),
-            file_name=f"insident_verslag_{learner_filter.replace(' ', '_')}.docx",
+            data=generate_word_report(filtered_incident_log, filtered_happenings_log, learner_filter),
+            file_name=f"verslag_{learner_filter.replace(' ', '_')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             key="learner_report_download"
         )
     else:
-        st.write("Kies 'n leerder om insidente te sien.")
+        st.write("Kies 'n leerder om insidente en gebeurtenisse te sien.")
 
 # Today's incidents
 st.header("Vandag se Insidente")
@@ -802,3 +1023,24 @@ if not today_incidents.empty:
     plt.close()
 else:
     st.write("Geen insidente vandag gerapporteer nie.")
+
+# Today's general happenings
+st.header("Vandag se Algemene Gebeurtenisse")
+today_happenings = happenings_log[happenings_log['Date'] == today]
+if not today_happenings.empty:
+    st.write(f"Totale Gebeurtenisse Vandag: {len(today_happenings)}")
+    today_happenings_display = today_happenings.copy()
+    today_happenings_display.index = today_happenings_display.index + 1
+    st.dataframe(
+        today_happenings_display,
+        use_container_width=True,
+        column_config={
+            "Learner_Full_Name": st.column_config.TextColumn("Leerder Naam", width="medium"),
+            "Block": st.column_config.TextColumn("Blok", width="small"),
+            "Event": st.column_config.TextColumn("Gebeurtenis", width="medium"),
+            "Comment": st.column_config.TextColumn("Kommentaar", width="large"),
+            "Date": st.column_config.DateColumn("Datum", width="medium", format="YYYY-MM-DD")
+        }
+    )
+else:
+    st.write("Geen algemene gebeurtenisse vandag gerapporteer nie.")
